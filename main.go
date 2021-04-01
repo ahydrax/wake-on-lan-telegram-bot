@@ -106,11 +106,12 @@ func processUpdates(ctx context.Context, updates tgbotapi.UpdatesChannel, bot *t
 		case <-ctx.Done():
 			return
 		case update := <-updates:
-			if update.Message != nil && update.Message.Chat.ID == ownerId {
+			message := update.Message
+			if message != nil && message.Chat.ID == ownerId {
+				chat := message.Chat
+				text := message.Text
 
-				text := update.Message.Text
-
-				log.Println("Got update: '", text, "' from ", update.Message.Chat.ID)
+				log.Println("Got update: '", text, "' from ", chat.ID)
 
 				if text == "/start" {
 
@@ -129,6 +130,9 @@ func processUpdates(ctx context.Context, updates tgbotapi.UpdatesChannel, bot *t
 						continue
 					}
 					client.Wake(machine.Address, mac)
+
+					deleteMsgConfig := tgbotapi.NewDeleteMessage(chat.ID, message.MessageID)
+					bot.DeleteMessage(deleteMsgConfig)
 				}
 			}
 		}
