@@ -62,7 +62,7 @@ func main() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
-	updates := bot.GetUpdatesChan(u)
+	updates, err := bot.GetUpdatesChan(u)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func processUpdates(ctx context.Context, updates tgbotapi.UpdatesChannel, bot *t
 					client.Wake(machine.Address, mac)
 
 					deleteMsgConfig := tgbotapi.NewDeleteMessage(chat.ID, message.MessageID)
-					bot.Request(deleteMsgConfig)
+					bot.DeleteMessage(deleteMsgConfig)
 				}
 			}
 		}
