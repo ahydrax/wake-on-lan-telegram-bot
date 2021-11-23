@@ -14,11 +14,6 @@ import (
 	"syscall"
 )
 
-const (
-	name        = "Wake on Lan Telegram bot"
-	description = "Helps you with booting your PCs"
-)
-
 type AppConfig struct {
 	Machines []struct {
 		Name    string
@@ -27,6 +22,7 @@ type AppConfig struct {
 	}
 	Bot struct {
 		BotKey  string
+		ChannelId int64
 		OwnerId int64
 	}
 }
@@ -41,13 +37,11 @@ func init() {
 	content, err := ioutil.ReadFile(configPath)
 	if err != nil {
 		log.Fatal(err)
-		panic(err)
 	}
 
 	err = json.Unmarshal(content, &config)
 	if err != nil {
 		log.Fatal(err)
-		panic(err)
 	}
 }
 
@@ -62,23 +56,20 @@ func main() {
 	bot, err := tgbotapi.NewBotAPI(config.Bot.BotKey)
 	if err != nil {
 		log.Fatal(err)
-		panic(err)
 	}
 	defer bot.StopReceivingUpdates()
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
-	updates, err := bot.GetUpdatesChan(u)
+	updates := bot.GetUpdatesChan(u)
 	if err != nil {
 		log.Fatal(err)
-		panic(err)
 	}
 
 	wolClient, err := wol.NewClient()
 	if err != nil {
 		log.Fatal(err)
-		panic(err)
 	}
 	defer wolClient.Close()
 
@@ -91,6 +82,7 @@ func main() {
 func processUpdates(ctx context.Context, updates tgbotapi.UpdatesChannel, bot *tgbotapi.BotAPI, client *wol.Client) {
 
 	ownerId := config.Bot.OwnerId
+	channelId := config.Bot.ChannelId
 
 	kbButtons := make([]tgbotapi.KeyboardButton, len(config.Machines))
 	for i := range kbButtons {
@@ -107,7 +99,14 @@ func processUpdates(ctx context.Context, updates tgbotapi.UpdatesChannel, bot *t
 			return
 		case update := <-updates:
 			message := update.Message
-			if message != nil && message.Chat.ID == ownerId {
+			if update.Message == nil {
+				message = update.ChannelPost
+				if message == nil {
+					continue
+				}
+			}
+
+			if message.Chat.ID == ownerId || message.Chat.ID == channelId {
 				chat := message.Chat
 				text := message.Text
 
@@ -132,7 +131,7 @@ func processUpdates(ctx context.Context, updates tgbotapi.UpdatesChannel, bot *t
 					client.Wake(machine.Address, mac)
 
 					deleteMsgConfig := tgbotapi.NewDeleteMessage(chat.ID, message.MessageID)
-					bot.DeleteMessage(deleteMsgConfig)
+					bot.Request(deleteMsgConfig)
 				}
 			}
 		}
